@@ -1,0 +1,10 @@
+django-mongo-rest is a library that streamlines the creation of REST APIs using django and mongoengine. Useful features include:
+
+* BaseModel - Simplify pymongo's apis for python use and allow permissions on individual documents. We have found that while mongoengine is nice for creating collections and indices and for validating models, it can be very slow and cumbersome (auto dereferencing for example) when used for actually querying the db. Therefore we do all of our querying using pymongo directly. BaseModel makes it very easy.
+* ModelView - Subclassing this automatically creates GET, POST, PATCH, and DELETE apis for a given model.
+* ApiView - Subclassing this provides features such as parameter validation and permissioning, which make it easier to build apis. ModelView is a subclass of ApiView.
+* serialize.py - Easy serialization of models
+* ApiExceptions/ApiExceptionMiddleware - Create json error responses.
+* Audit - Audit logs for any inserts, updates, or deletes.
+
+* NOTE * django-mongo-rest is still very young. Interfaces may change at any time.
