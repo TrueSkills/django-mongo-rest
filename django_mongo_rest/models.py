@@ -127,6 +127,8 @@ class BaseModel(Document):
             upd['$addToSet'] = kwargs.pop('$addToSet')
         if '$pull' in kwargs:
             upd['$pull'] = kwargs.pop('$pull')
+        if '$inc' in kwargs:
+            upd['$inc'] = kwargs.pop('$inc')
         if kwargs:
             upd['$set'] = kwargs
         if unset:
