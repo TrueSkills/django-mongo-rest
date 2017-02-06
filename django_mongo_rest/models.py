@@ -227,3 +227,17 @@ class LocationMixin(object):
     zip_code = StringField(max_length=15, required=True)
     lat = DecimalField(precision=20, required=True, min_value=-90, max_value=90)
     lng = DecimalField(precision=20, required=True, min_value=-180, max_value=180)
+
+    @staticmethod
+    def get_location(doc):
+        return {k: doc[k] for k in LocationMixin.SERIALIZE_FIELDS if k in doc}
+
+    @staticmethod
+    def display_location(doc):
+        loc = doc.get('city', '')
+        if 'state' in doc:
+            loc += ', ' + doc['state_code']
+        if 'country' in doc:
+            loc += ', ' + doc['country_code']
+
+        return loc.lstrip(', ')
