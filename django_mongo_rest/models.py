@@ -237,9 +237,9 @@ class LocationMixin(object):
     @staticmethod
     def display_location(doc):
         loc = doc.get('city', '')
-        if 'state' in doc:
+        if 'state_code' in doc:
             loc += ', ' + doc['state_code']
-        if 'country' in doc:
+        if 'country_code' in doc:
             loc += ', ' + doc['country_code']
 
         return loc.lstrip(', ')
