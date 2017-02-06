@@ -157,11 +157,11 @@ class BaseModel(Document):
         return cls.update_one({'_id': _id}, update_params=update_params, **kwargs)
 
     @classmethod
-    def find_one_and_update(cls, update_params, update, return_document=True, projection=None):
-        query = cls._get_lookup_query_update(update_params.lookup_dict, request=update_params.request)
+    def find_one_and_update(cls, lookup_dict, update, update_params=UpdateParams(), return_document=True, projection=None):
+        query = cls._get_lookup_query_update(lookup_dict, request=update_params.request)
         upd = cls._get_update_query(unset=update_params.unset, **update)
         return cls._get_collection().find_one_and_update(query, upd, return_document=return_document,
-                                                         projection=projection)
+                                                         projection=projection, upsert=update_params.upsert)
 
     @classmethod
     def delete_one(cls, request=None, **kwargs):
