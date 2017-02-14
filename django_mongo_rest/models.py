@@ -94,7 +94,8 @@ class BaseModel(Document):
 
     @classmethod
     def find_by_ids(cls, ids, params=FindParams()):
-        ids = [ObjectId(i) for i in ids]
+        if isinstance(cls.id, ObjectIdField):
+            ids = [ObjectId(i) for i in ids]
         return cls.find(_id={'$in': ids}, params=params)
 
     @classmethod
