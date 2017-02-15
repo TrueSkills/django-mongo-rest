@@ -150,8 +150,8 @@ def _extract_request_model_recursive(model_class, request, input_data, allowed_f
 
     return doc
 
-Filter = namedtuple('Filter', 'field type_cast')
-Filter.__new__.__defaults__ = (lambda x: x,)
+Filter = namedtuple('Filter', 'field type_cast preserve_case')
+Filter.__new__.__defaults__ = (lambda x: x, False)
 
 class ModelView(ApiView):
     duplicate_key_ok = True
@@ -268,10 +268,16 @@ class ModelView(ApiView):
         if request.GET.get('mine'):
             query.update(self.model.allowed_update_query(request))
 
-        for k, v in kwargs.iteritems():
+        filter_args = {}
+        filter_args.update(kwargs)
+        filter_args.update(request.GET.items())
+        for k, v in filter_args.iteritems():
             if k in self.filters:
                 flter = self.filters[k]
-                query[flter.field] = flter.type_cast(v)
+                v = flter.type_cast(v)
+                if isinstance(v, (str, unicode)) and not flter.preserve_case:
+                    v = v.lower()
+                query[flter.field] = v
 
         try:
             objs = list(self.model.find(params=params, **query))
