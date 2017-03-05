@@ -189,8 +189,8 @@ class BaseModel(Document):
             raise
 
     @classmethod
-    def insert_many(cls, objs):
-        return cls._get_collection().insert_many(objs)
+    def insert_many(cls, objs, ordered=False):
+        return cls._get_collection().insert_many(objs, ordered=ordered)
 
     @classmethod
     def aggregate(cls, *args, **kwargs):
