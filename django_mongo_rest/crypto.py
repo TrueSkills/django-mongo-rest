@@ -19,7 +19,7 @@ def _signature(querystring, salt):
 
 def sign_querystring(querystring, salt, timestamp_override=None):
     if isinstance(querystring, dict):
-        querystring = urlencode(querystring.encode('utf8'))
+        querystring = urlencode(querystring)
 
     timestamp = timestamp_override or calendar.timegm(timezone.now().timetuple())
     querystring += '&%s=%d&%s=%s' % (TIMESTAMP_QUERY_PARAM, timestamp, SALT_QUERY_PARAM, salt)
