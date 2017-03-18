@@ -17,9 +17,14 @@ class ExpiredSig(Exception):
 def _signature(querystring, salt):
     return signing.Signer(key=settings.SECRET_KEY, salt=salt).signature(querystring)
 
+def make_utf8(s):
+    if isinstance(s, unicode):
+        return s.encode('utf8')
+    return s
+
 def sign_querystring(querystring, salt, timestamp_override=None):
     if isinstance(querystring, dict):
-        querystring = urlencode(querystring)
+        querystring = urlencode({make_utf8(k): make_utf8(v) for k, v in querystring.iteritems()})
 
     timestamp = timestamp_override or calendar.timegm(timezone.now().timetuple())
     querystring += '&%s=%d&%s=%s' % (TIMESTAMP_QUERY_PARAM, timestamp, SALT_QUERY_PARAM, salt)
