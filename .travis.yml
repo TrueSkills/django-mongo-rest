@@ -3,6 +3,6 @@ services: mongodb
 install:
 # install all dependencies
     - python setup.py install
-    - pip install pytest
+    - pip install pytest django
 # command to run tests
 script: py.test
