@@ -3,3 +3,4 @@ git+https://github.com/MongoEngine/django-mongoengine@207df40
 pytest
 enum
 simplejson
+pytz
