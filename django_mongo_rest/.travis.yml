@@ -1,0 +1,5 @@
+language: python
+before_script:
+    services: mongodb
+# command to run tests
+script: pytest
