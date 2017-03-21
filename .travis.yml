@@ -1,4 +1,5 @@
 language: python
+sudo: required
 services: mongodb
 # command to install dependencies
 install: "pip install -r requirements.txt"
