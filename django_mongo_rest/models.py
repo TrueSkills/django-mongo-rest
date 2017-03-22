@@ -49,7 +49,7 @@ class BaseModel(Document):
     @classmethod
     def _get_lookup_query_find(cls, query, allow_deleted=False, request=None):
         query = cls._get_lookup_query(query, allow_deleted=allow_deleted)
-        if request:
+        if request and not request.user.is_superuser:
             query = {
                 '$and': [query, cls.allowed_find_query(request)]
             }
@@ -58,7 +58,7 @@ class BaseModel(Document):
     @classmethod
     def _get_lookup_query_update(cls, query, allow_deleted=False, request=None):
         query = cls._get_lookup_query(query, allow_deleted=allow_deleted)
-        if request:
+        if request and not request.user.is_superuser:
             query = {
                 '$and': [query, cls.allowed_update_query(request)]
             }
