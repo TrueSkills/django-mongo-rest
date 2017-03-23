@@ -125,10 +125,11 @@ def _serialize(doc_cls, dicts, foreign_key_cache, include_fields=None):
     if foreign_key_cache is None:
         foreign_key_cache = _prefetch_foreign_keys(doc_cls, dicts, fields_to_serialize)
 
+    if hasattr(doc_cls, 'serialize_preprocess'):
+        doc_cls.serialize_preprocess(dicts)
+
     res = []
     for dct in dicts:
-        if hasattr(doc_cls, 'serialize_preprocess'):
-            doc_cls.serialize_preprocess(dct)
 
         fields = {}
         for field in fields_to_serialize:
