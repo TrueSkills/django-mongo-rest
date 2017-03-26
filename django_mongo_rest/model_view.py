@@ -165,6 +165,9 @@ class ModelView(ApiView):
 
     real_delete = False  # Whether to really delete documents or to only mark them as deleted
     filters = {}  # hash of Filters to be used with list api
+    sortable_fields = []
+
+    SORTABLE_ALL = 'sortable_all'
 
     def auto_populate_new_model(self, request, obj):
         raise NotImplementedError()
@@ -258,37 +261,95 @@ class ModelView(ApiView):
         return {pluralize(self.model.get_collection_name()): serialized,
                 'objects': serialized}  # Temporarily return both model name and objects until ui is migrated
 
-    def get_list(self, request, **kwargs):
-        NUM_RESULTS = 10
-        # TODO add order by field to each model
-        params = FindParams(
-            request=request,
-            sort=[('_id', -1)], limit=NUM_RESULTS
-        )
-
-        query = {}
-        if request.GET.get('mine'):
-            query.update(self.model.allowed_update_query(request))
-
+    def _filter(self, request, query, view_kwargs):
         filter_args = {}
-        filter_args.update(kwargs)
+        filter_args.update(view_kwargs)
         filter_args.update(request.GET.items())
         for k, v in filter_args.iteritems():
+            operator = None
+            if '__' in k:
+                k, operator = k.split('__')
+
             if k in self.filters:
                 flter = self.filters[k]
                 v = flter.type_cast(v)
                 if isinstance(v, (str, unicode)) and not flter.preserve_case:
                     v = v.lower()
+
                 query[flter.field] = v
 
+    @staticmethod
+    def _paginate(request, cursor):
+        if request.GET.get('skip'):
+            try:
+                cursor.skip(int(request.GET['skip']))
+            except (TypeError, ValueError):
+                raise ApiException('skip must be an integer', 400)
+
+        DEFAULT_LIMIT = 10
+        if request.GET.get('cnt'):
+            try:
+                cursor.limit(int(request.GET.get('cnt')) or DEFAULT_LIMIT)
+            except (TypeError, ValueError):
+                raise ApiException('cnt must be an integer', 400)
+        else:
+            cursor.limit(DEFAULT_LIMIT)
+
+    def _sort(self, request, cursor):
+        if not request.GET.get('sort'):
+            return
+
+        sort_field = request.GET.get('sort')
+        if (self.sortable_fields != self.SORTABLE_ALL and sort_field not in self.sortable_fields):
+            raise ApiException('Unknown sort field: %s. Allowed are %s' %
+                               (sort_field, self.sortable_fields), 400)
+
+        fields_map = {}
+        for f in self.model.serialize_fields:
+            if isinstance (f, tuple):
+                fields_map[f[1]] = f[0]
+            elif f == '_id':
+                fields_map['id'] = f
+            else:
+                fields_map[f] = f
+
+        if sort_field not in fields_map:
+            raise ApiException('Unknown sort field: %s. Allowed are %s' %
+                               (sort_field, self.sortable_fields), 400)
+
         try:
-            objs = list(self.model.find(params=params, **query))
+            direction = int(request.GET.get('sortDir', 1))
+        except (TypeError, ValueError):
+            raise ApiException('sortDir must be either 1 or -1', 400)
+        if direction not in [1, -1]:
+            raise ApiException('sortDir must be either 1 or -1', 400)
+
+        cursor.sort(fields_map[sort_field], direction=direction)
+
+    def get_list(self, request, **kwargs):
+        params = FindParams(request=request)
+
+        query = {}
+        if request.GET.get('mine'):
+            query.update(self.model.allowed_update_query(request))
+
+        self._filter(request, query, kwargs)
+
+        try:
+            cursor = self.model.find(params=params, **query)
         except ModelPermissionException:
+            num_matches = 0
             objs = []
+        else:
+            num_matches = cursor.count()
+            self._paginate(request, cursor)
+            self._sort(request, cursor)
+            objs = list(cursor)
 
         serialized = serialize(self.model, objs)
         return {pluralize(self.model.get_collection_name()): serialized,
-                'objects': serialized}  # Temporarily return both model name and objects until ui is migrated
+                'objects': serialized, # Temporarily return both model name and objects until ui is migrated
+                'num_maches': num_matches}
 
     def extract_request_model(self, request, input_data, allowed_fields, existing=None):
         errors = {}

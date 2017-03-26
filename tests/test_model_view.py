@@ -73,6 +73,21 @@ def test_get_by_id_logged_out(model):
 def test_get_by_invalid_id():
     assert_status(get_api('model_get_only/%s/' % ObjectId()), 404)
 
+def test_pagination(models, user_session):
+    user, client = user_session
+
+    res = get_api('model_get_only/?cnt=1&skip=2&sort=id', client=client)
+    returned_models = res.json()['playground_models']
+    assert len(returned_models) == 1
+
+    expected_model = models[2]
+    clean_expected_model(expected_model)
+
+    for actual in returned_models:
+        actual['_id'] = ObjectId(actual.pop('id'))
+
+    assert returned_models[0] == expected_model
+
 def test_delete_not_supported():
     assert_status(delete_api('model_get_only/'), 405)
 
@@ -82,7 +97,6 @@ def test_delete_no_id(user_session_const):
     assert_status(res, 404)
 
 def test_delete(models, user_session):
-    models = models
     user, client = user_session
     deleted_model_id = models[0]['_id']
     assert_status(delete_api('model/%s/' % deleted_model_id, client=client))
@@ -92,7 +106,7 @@ def test_delete(models, user_session):
     assert_status(get_api('model_get_only/%s/' % deleted_model_id), 404)
 
     # No id - should fetch 2/3 models
-    res = get_api('model_get_only/', client=client)
+    res = get_api('model_get_only/?sort=id&sortDir=-1', client=client)
     returned_models = res.json()['playground_models']
     assert len(returned_models) == len(models) - 1
 

@@ -9,5 +9,6 @@ def test_permission_queries(user):
     request = DummyObject()
     request.user = DummyObject()
     request.user.is_authenticated = lambda: True
+    request.user.is_superuser = False
     request.user.id = user['_id']
     assert PlaygroundModel.find_one(created_by='123', params=FindParams(request=request)) is None

@@ -14,7 +14,7 @@ class User(AbstractUser, BaseModel):
     }
 
     serialize_fields = (
-        '_id',
+        ('_id', 'id'),
         'email',
         'email_verified',
         'is_superuser',
@@ -46,7 +46,7 @@ class PlaygroundEmbeddedDoc(EmbeddedDocument):
     start_date = StringField(validator=date_str_validator)
 
 class PlaygroundModel(BaseModel):
-    serialize_fields = ('_id', 'string', 'integer', 'decimal', 'embedded_list')
+    serialize_fields = (('_id', 'id'), 'string', 'integer', 'decimal', 'embedded_list')
     string = StringField(max_length=10, min_length=3, required=True)
     integer = IntField(min_value=4, max_value=100)
     integer_immutable = IntField(min_value=4, max_value=10, less_than_equal_to='integer')

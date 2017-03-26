@@ -93,3 +93,4 @@ class PlaygroundModelView(ModelView):
 class PlaygroundModelViewGetOnly(PlaygroundModelView):
     allowed_methods = ['GET']
     permissions = []
+    sortable_fields = ['id']
