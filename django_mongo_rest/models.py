@@ -209,38 +209,3 @@ class BaseModel(Document):
     def get_unique_indices(cls):
         indices = cls._meta['index_specs']
         return [idx for idx in indices if idx.get('unique')]
-
-class LocationMixin(object):
-    SERIALIZE_FIELDS = (
-        'street',
-        'city',
-        'state_code',
-        'region',
-        'country_code',
-        'zip_code',
-        'lat',
-        'lng',
-    )
-
-    street = StringField(max_length=64, required=True)
-    city = StringField(max_length=32, required=True)
-    state_code = StringField(max_length=2, min_length=2, required=True)
-    region = StringField(max_length=32, required=True)
-    country_code = StringField(max_length=3, min_length=2, required=True)
-    zip_code = StringField(max_length=15, required=True)
-    lat = DecimalField(precision=20, required=True, min_value=-90, max_value=90)
-    lng = DecimalField(precision=20, required=True, min_value=-180, max_value=180)
-
-    @staticmethod
-    def get_location(doc):
-        return {k: doc[k] for k in LocationMixin.SERIALIZE_FIELDS if k in doc}
-
-    @staticmethod
-    def display_location(doc):
-        loc = doc.get('city', '')
-        if 'state_code' in doc:
-            loc += ', ' + doc['state_code']
-        if 'country_code' in doc:
-            loc += ', ' + doc['country_code']
-
-        return loc.lstrip(', ')
