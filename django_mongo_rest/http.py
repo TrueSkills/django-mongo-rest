@@ -33,7 +33,7 @@ def _parse_params(request):
             request.dmr_params = json.loads(request.body)
         except ValueError:
             raise ApiException('This api accepts json encoded data', 400)
-    elif request.method in ('GET', 'DELETE'):
+    elif request.method in ('GET', 'DELETE', 'HEAD'):
         request.dmr_params = request.GET
     else:
         raise Exception('Method not supported. Please implement.')
@@ -95,12 +95,18 @@ class _EndpointView(object):
 class ApiView(_EndpointView):
     expected_content_type = 'application/json'
 
-    def main_wrapper(self, *args, **kwargs):
-        res = self.main(*args, **kwargs)
+    def main_wrapper(self, request, *args, **kwargs):
+        res = self.main(request, *args, **kwargs)
+
         if isinstance(res, dict):
-            return JsonResponse(res)
-        if res is None:
-            return HttpResponse()
+            res = JsonResponse(res)
+        elif res is None:
+            res = HttpResponse()
+
+        if request.method == 'HEAD':
+            res.content = ''
+
+        return res
         return res
 
 class PageView(_EndpointView):
@@ -130,8 +136,11 @@ class PageView(_EndpointView):
             path = request.get_full_path()
             return redirect_to_login(path, settings.LOGIN_URL, 'next')
 
-    def main_wrapper(self, *args, **kwargs):
-        return self.main(*args, **kwargs)
+    def main_wrapper(self, request, *args, **kwargs):
+        res = self.main(request,*args, **kwargs)
+        if request.method == 'HEAD':
+            res.content = ''
+        return res
 
 def get_params_api(dct, params, request):
     try:
