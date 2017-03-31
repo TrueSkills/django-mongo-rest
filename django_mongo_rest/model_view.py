@@ -29,7 +29,7 @@ def _get_duplicate_model(model_class, model):
 
 def _remove_empty_lists(doc):
     for k, v in doc.items():
-        if v == [] or v is False:  # We don't store false bools, waste of space.
+        if v == []:
             del doc[k]
         elif isinstance(v, dict):
             _remove_empty_lists(v)
@@ -118,7 +118,7 @@ def _extract_request_model_field(request, doc, input_data, field, allowed_fields
     existing_val = getattr(doc, field.name, None)
     # Convert field.to_python because some fields, such as DecimalField, won't be equal otherwise
     # Decimal('3.33000000000000000000') != 3.33
-    isNone = val is None or val is False  # We don't store false bools, waste of space.
+    isNone = val is None
     if (isNone and existing_val is not None or
             not isNone and getattr(doc, field.name, None) != field.to_python(val)):
         changed_fields.append(field.name)
@@ -391,9 +391,7 @@ class ModelView(ApiView):
         unset = []
         for field_name, field in self.model._fields.iteritems():
             val = request.dmr_params.get(field_name, True)
-            if (val is None or val == [] or
-                    # We don't store false bools, waste of space.
-                    (isinstance(field, BooleanField) and (val is False or field_name not in obj))):
+            if val is None or val == []:
                 unset.append(field_name)
 
         update_params = UpdateParams(request=None if request.user.is_superuser else request, unset=unset)

@@ -337,20 +337,20 @@ def test_embedded_doc_list_extra_field(user_session_const):
     _verify_created_model(user, client, expected, clean_expected_func=clean_expected)
 
 def _verify_update(user, client, model):
-    model2 = deepcopy(model)
-    model2['last_updated'] = calendar.timegm(model2['last_updated'].timetuple())  # api expects unix timestamp
-    res = patch_api('model/%s/' % model2['_id'], client=client, data=model2)
+    model = deepcopy(model)
+    model['last_updated'] = calendar.timegm(model['last_updated'].timetuple())  # api expects unix timestamp
+    res = patch_api('model/%s/' % model['_id'], client=client, data=model)
     assert_status(res)
-    db_model = PlaygroundModel.find_by_id(model2['_id'])
+    db_model = PlaygroundModel.find_by_id(model['_id'])
 
-    model2.pop('field_should_be_ignored', None)
-    model2.pop('integer_immutable', None)
-    if model2.get('boolean') is False:
-        del model2['boolean']
+    model.pop('field_should_be_ignored', None)
+    model.pop('integer_immutable', None)
+    if 'boolean' in model and model['boolean'] is None:
+        del model['boolean']
 
-    _assert_models_equal(user, model2, db_model)
+    _assert_models_equal(user, model, db_model)
 
-    del model2['decimal']
+    del model['decimal']
 
 def test_update(user_session_const, model):
     user, client = user_session_const
@@ -380,22 +380,14 @@ def test_update_true_bools_saved(user_session_const, model):
         'boolean': True
     }, user['_id'], 'U')
 
-def test_false_equivalent_none(user_session_const, model):
-    user, client = user_session_const
-
-    # boolean is already None, so no changes
-    model['boolean'] = False
-    _verify_update(user, client, model)
-    assert MONGODB.audit.find_one({'doc_id': model['_id']}) is None
-
-def test_update_false_bools_not_saved(user_session_const, model):
+def test_update_false_bools(user_session_const, model):
     user, client = user_session_const
     MONGODB.playground_model.update_one({'_id': model['_id']}, {'$set': {'boolean': True}})
     model['boolean'] = False
     _verify_update(user, client, model)
     _assert_audit_log({
         '_id': model['_id'],
-        'boolean': None
+        'boolean': False
     }, user['_id'], 'U')
 
 def test_update_someone_elses_model(user_session_const, model):
