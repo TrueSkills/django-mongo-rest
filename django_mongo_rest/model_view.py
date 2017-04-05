@@ -129,9 +129,10 @@ def _extract_request_model_recursive(model_class, request, input_data, allowed_f
                                      changed_fields, permission_exempt_fields, existing=None):
     # pylint: disable=too-many-arguments
     doc = existing or model_class()
-    for name, field in model_class._fields.iteritems():
-        _extract_request_model_field(request, doc, input_data, field, allowed_fields, errors, changed_fields,
-                                     permission_exempt_fields)
+    if input_data:
+        for name, field in model_class._fields.iteritems():
+            _extract_request_model_field(request, doc, input_data, field, allowed_fields, errors, changed_fields,
+                                         permission_exempt_fields)
 
     doc.last_updated = now()
 
