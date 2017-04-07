@@ -336,19 +336,21 @@ def test_embedded_doc_list_extra_field(user_session_const):
 
     _verify_created_model(user, client, expected, clean_expected_func=clean_expected)
 
-def _verify_update(user, client, model):
+def _verify_update(user, client, model, expected_model=None):
     model = deepcopy(model)
     model['last_updated'] = calendar.timegm(model['last_updated'].timetuple())  # api expects unix timestamp
     res = patch_api('model/%s/' % model['_id'], client=client, data=model)
     assert_status(res)
     db_model = PlaygroundModel.find_by_id(model['_id'])
 
-    model.pop('field_should_be_ignored', None)
-    model.pop('integer_immutable', None)
-    if 'boolean' in model and model['boolean'] is None:
-        del model['boolean']
+    expected_model = expected_model or model
+    expected_model = deepcopy(expected_model)
+    expected_model.pop('field_should_be_ignored', None)
+    expected_model.pop('integer_immutable', None)
+    if 'boolean' in expected_model and expected_model['boolean'] is None:
+        del expected_model['boolean']
 
-    _assert_models_equal(user, model, db_model)
+    _assert_models_equal(user, expected_model, db_model)
 
     del model['decimal']
 
@@ -415,6 +417,22 @@ def test_update_out_of_date(user_session_const, model):
     res = res.json()
     assert res['message'] == 'Object is out of date'
     assert res['new_obj'] == serialize(PlaygroundModel, model)
+
+def test_update_null_embedded_doc(user_session_const, model):
+    '''Should not be saved'''
+    user, client = user_session_const
+    model['embedded_list_optional'] = [None, {
+        'embedded_string': 'sdfg'
+    }]
+    expected_model = deepcopy(model)
+    expected_model['embedded_list_optional'] = model['embedded_list_optional'][1:]
+    _verify_update(user, client, model, expected_model=expected_model)
+    _assert_audit_log({
+        '_id': model['_id'],
+        'embedded_list_optional': [{
+            'embedded_string': 'sdfg'
+        }]
+    }, user['_id'], 'U')
 
 def test_unset(user_session_const, model):
     user, client = user_session_const

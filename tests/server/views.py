@@ -80,7 +80,8 @@ class PlaygroundModelView(ModelView):
     allowed_methods = ['GET', 'POST', 'PATCH', 'DELETE']
     permissions = [PERMISSION.LOGIN]
     editable_fields = {'string': 1, 'integer': 1, 'ref': 1, 'default_required': 1, 'default_optional': 1,
-                       'embedded_list': ('embedded_string', 'start_date'), 'decimal': 1, 'boolean': 1}
+                       'embedded_list': ('embedded_string', 'start_date'), 'decimal': 1, 'boolean': 1,
+                       'embedded_list_optional': ('embedded_string',)}
     initial_fields = deepcopy(editable_fields)
     initial_fields['integer_immutable'] = 1
 

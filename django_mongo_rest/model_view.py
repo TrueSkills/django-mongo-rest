@@ -46,7 +46,8 @@ def _extract_embedded_document_list(request, field, input_list, allowed_fields, 
             errors[i] = subdoc_errors
             continue
 
-        the_list.append(subdoc)
+        if subdoc.to_mongo():
+            the_list.append(subdoc)
 
     if errors:
         raise ValidationError('Validation Error', errors=errors)

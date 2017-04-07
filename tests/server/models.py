@@ -35,6 +35,10 @@ class User(AbstractUser, BaseModel):
     def get_username(self):
         return self.username
 
+class PlaygroundEmbeddedDocAllOptional(EmbeddedDocument):
+    serialize_fields = ('embedded_string',)
+    embedded_string = StringField()
+
 class PlaygroundEmbeddedDoc(EmbeddedDocument):
     serialize_fields = ('embedded_string',)
 #     _id = ObjectIdField(default=ObjectId) Doesn't play well with audit log. Maybe support this later
@@ -54,6 +58,7 @@ class PlaygroundModel(BaseModel):
     decimal = DecimalField(precision=20)
     boolean = BooleanField()
     embedded_list = EmbeddedDocumentListField(PlaygroundEmbeddedDoc)
+    embedded_list_optional = EmbeddedDocumentListField(PlaygroundEmbeddedDocAllOptional)
     created_by = ReferenceField(User)
 
     @classmethod
