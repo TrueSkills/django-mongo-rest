@@ -242,7 +242,7 @@ class ModelView(ApiView):
     def get_by_id(self, request, obj_id):
         obj = get_object_or_404_by_id(self.model, request, obj_id,
                                       enforce_permissions=not request.user.is_superuser)
-        serialized = serialize(self.model, obj)
+        serialized = serialize(self.model, obj, request)
         return {self.model.get_collection_name(): serialized,
                 'object': serialized}  # Temporarily return both model name and objects until ui is migrated
 
@@ -257,7 +257,7 @@ class ModelView(ApiView):
             found_ids = {str(obj['_id']) for obj in objs}
             missing_ids = [i for i in ids if i not in found_ids]
             raise ApiException(', '.join(missing_ids) + ' not found', 404)
-        serialized = serialize(self.model, objs)
+        serialized = serialize(self.model, objs, request)
         return {pluralize(self.model.get_collection_name()): serialized,
                 'objects': serialized}  # Temporarily return both model name and objects until ui is migrated
 
@@ -346,7 +346,7 @@ class ModelView(ApiView):
             self._sort(request, cursor)
             objs = list(cursor)
 
-        serialized = serialize(self.model, objs)
+        serialized = serialize(self.model, objs, request)
         return {pluralize(self.model.get_collection_name()): serialized,
                 'objects': serialized, # Temporarily return both model name and objects until ui is migrated
                 'num_maches': num_matches}
@@ -442,7 +442,7 @@ class ModelView(ApiView):
             raise Http404()
 
         existing_model = get_orm_object_or_404_by_id(self.model, request, obj_id)
-        self._refuse_conflicting_update(request.dmr_params, existing_model)
+        self._refuse_conflicting_update(request.dmr_params, request, existing_model)
 
         try:
             obj = self.extract_request_model(request, request.dmr_params, self.editable_fields,
@@ -475,7 +475,7 @@ class ModelView(ApiView):
         if not res.matched_count:
             raise ApiException(self.model.msg404(), 404)
 
-    def _refuse_conflicting_update(self, input_data, existing_model):
+    def _refuse_conflicting_update(self, input_data, request, existing_model):
         '''
         Check if user is trying to update an old version of this object
 
@@ -494,7 +494,7 @@ class ModelView(ApiView):
 
         existing_model = existing_model.to_mongo()
         if existing_model.get('last_updated', datetime(1970, 1, 1)) > request_last_updated:
-            up_to_date_obj = serialize(self.model, existing_model)
+            up_to_date_obj = serialize(self.model, existing_model, request)
             raise ApiException('Object is out of date', 409, new_obj=up_to_date_obj)
 
     def delete(self, request, obj_id):

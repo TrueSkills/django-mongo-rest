@@ -16,13 +16,13 @@ def _document_typeof(doc_cls, field_name):
 
     return None
 
-def _serialize_list(lst, list_element_doc_cls, foreign_key_cache):
+def _serialize_list(lst, list_element_doc_cls, request, foreign_key_cache):
     if not list_element_doc_cls:
         # List of ints or something
         return lst
 
     # List of embedded documents. Serialize recursively
-    return [_serialize(list_element_doc_cls, doc, foreign_key_cache) for doc in lst]
+    return [_serialize(list_element_doc_cls, doc, request, foreign_key_cache) for doc in lst]
 
 def _is_dereference_disabled(field_name):
     '''Usually we deference ObjectIds in ReferenceFields. But that can be disabled by appending '_id'
@@ -70,11 +70,11 @@ def _resolve_field_recursive(doc_cls, doc, field_segments, foreign_key_cache):
 
     return doc_cls, doc
 
-def _serialize_field(value_cls, value, foreign_key_cache):
+def _serialize_field(value_cls, value, request, foreign_key_cache):
     if value_cls and hasattr(value_cls, 'serialize_fields'):
-        return _serialize(value_cls, value, foreign_key_cache)
+        return _serialize(value_cls, value, request, foreign_key_cache)
     elif isinstance(value, (BaseList, list)):
-        return _serialize_list(value, value_cls, foreign_key_cache)
+        return _serialize_list(value, value_cls, request, foreign_key_cache)
     return value
 
 def _get_fields_to_serialize(doc_cls, include_fields=None):
@@ -116,7 +116,7 @@ def _prefetch_foreign_keys(doc_cls, dicts, field_names):
 
     return foreign_key_cache
 
-def _serialize(doc_cls, dicts, foreign_key_cache, include_fields=None):
+def _serialize(doc_cls, dicts, request, foreign_key_cache, include_fields=None):
     is_multiple = isinstance(dicts, (list, tuple))
     dicts = to_list(dicts)
 
@@ -126,7 +126,7 @@ def _serialize(doc_cls, dicts, foreign_key_cache, include_fields=None):
         foreign_key_cache = _prefetch_foreign_keys(doc_cls, dicts, fields_to_serialize)
 
     if hasattr(doc_cls, 'serialize_preprocess'):
-        doc_cls.serialize_preprocess(dicts)
+        doc_cls.serialize_preprocess(request, dicts)
 
     res = []
     for dct in dicts:
@@ -149,7 +149,7 @@ def _serialize(doc_cls, dicts, foreign_key_cache, include_fields=None):
             except AttributeError:
                 continue
             else:
-                fields[display] = _serialize_field(value_cls, value, foreign_key_cache)
+                fields[display] = _serialize_field(value_cls, value, request, foreign_key_cache)
                 if isinstance(fields[display], ObjectId):
                     fields[display] = str(fields[display])
         res.append(fields)
@@ -158,5 +158,5 @@ def _serialize(doc_cls, dicts, foreign_key_cache, include_fields=None):
         return res
     return res[0]
 
-def serialize(doc_cls, dicts, include_fields=None):
-    return _serialize(doc_cls, dicts, None, include_fields=include_fields)
+def serialize(doc_cls, dicts, request, include_fields=None):
+    return _serialize(doc_cls, dicts, request, None, include_fields=include_fields)

@@ -430,7 +430,7 @@ def test_update_out_of_date(user_session_const, model):
 
     res = res.json()
     assert res['message'] == 'Object is out of date'
-    assert res['new_obj'] == serialize(PlaygroundModel, model)
+    assert res['new_obj'] == serialize(PlaygroundModel, model, None)
 
 def test_update_null_embedded_doc(user_session_const, model):
     '''Should not be saved'''

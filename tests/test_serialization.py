@@ -141,14 +141,14 @@ def documents():
 
 def test_one(documents):
     docs, _, _, expected_serialized = documents
-    res = serialize(SerializationDoc, docs[0])
+    res = serialize(SerializationDoc, docs[0], None)
     assert expected_serialized[0] == res
 
 def test_many(documents):
     docs, _, _, expected_serialized = documents
 
     begin = time.time()
-    res = serialize(SerializationDoc, docs)
+    res = serialize(SerializationDoc, docs, None)
     elapsed_time = time.time() - begin
     print 'serialization took %.2fs' % elapsed_time
 
