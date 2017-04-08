@@ -54,6 +54,16 @@ def _extract_embedded_document_list(request, field, input_list, allowed_fields, 
 
     return the_list
 
+def _display_to_enum(field, val):
+    choices = getattr(field, 'choices', None)
+    if choices:
+        choices_dict = {c[1].lower(): c[0] for c in choices}
+        try:
+            return choices_dict[val.lower()]
+        except KeyError:
+            error_msg = 'Must be one of %s' % str([k.lower() for k in choices_dict.keys()])
+            raise ValidationError(errors=error_msg)
+
 def _process_value(request, field, val, allowed_fields, permission_exempt_fields):
     if isinstance(field, ReferenceField):
         kwargs = {}
@@ -68,15 +78,9 @@ def _process_value(request, field, val, allowed_fields, permission_exempt_fields
         if isinstance(val, string_types) and not len(val):
             return None
 
-        choices = getattr(field, 'choices', None)
-        if choices:
-            choices_dict = {c[1].lower(): c[0] for c in choices}
-            try:
-                return choices_dict[val.lower()]
-            except KeyError:
-                error_msg = 'Must be one of %s' % str([k.lower() for k in choices_dict.keys()])
-                raise ValidationError(errors=error_msg)
-
+        enum_val = _display_to_enum(field, val)
+        if enum_val:
+            return enum_val
     elif isinstance(field, EmbeddedDocumentListField):
         return _extract_embedded_document_list(request, field, val or [], allowed_fields[field.name],
                                                permission_exempt_fields)
@@ -275,6 +279,11 @@ class ModelView(ApiView):
                 v = flter.type_cast(v)
                 if isinstance(v, (str, unicode)) and not flter.preserve_case:
                     v = v.lower()
+
+                try:
+                    v = _display_to_enum(getattr(self.model, flter.field), v) or v
+                except ValidationError:
+                    pass
 
                 query[flter.field] = v
 
