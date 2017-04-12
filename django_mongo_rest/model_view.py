@@ -27,12 +27,12 @@ def _get_duplicate_model(model_class, model):
         if duplicate:
             return duplicate
 
-def _remove_empty_lists(doc):
+def remove_empty_lists(doc):
     for k, v in doc.items():
         if v == []:
             del doc[k]
         elif isinstance(v, dict):
-            _remove_empty_lists(v)
+            remove_empty_lists(v)
 
 def _extract_embedded_document_list(request, field, input_list, allowed_fields, permission_exempt_fields):
     document_type = field.field.document_type
@@ -372,7 +372,7 @@ class ModelView(ApiView):
 
         doc = doc.to_mongo()
 
-        _remove_empty_lists(doc)
+        remove_empty_lists(doc)
 
         request.model_view_changed_fields = changed_fields
         try:
