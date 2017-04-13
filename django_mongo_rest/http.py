@@ -92,6 +92,9 @@ class _EndpointView(object):
     def is_authorized(self, request):
         return is_authorized(request, self.permissions)
 
+    def main_wrapper(self, request, *args, **kwargs):
+        raise NotImplementedError
+
 class ApiView(_EndpointView):
     expected_content_type = 'application/json'
 
@@ -106,7 +109,6 @@ class ApiView(_EndpointView):
         if request.method == 'HEAD':
             res.content = ''
 
-        return res
         return res
 
 class PageView(_EndpointView):
