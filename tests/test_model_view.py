@@ -77,7 +77,8 @@ def test_pagination(models, user_session):
     user, client = user_session
 
     res = get_api('model_get_only/?cnt=1&skip=2&sort=id', client=client)
-    returned_models = res.json()['playground_models']
+    res = res.json()
+    returned_models = res['playground_models']
     assert len(returned_models) == 1
 
     expected_model = models[2]
@@ -87,6 +88,7 @@ def test_pagination(models, user_session):
         actual['_id'] = ObjectId(actual.pop('id'))
 
     assert returned_models[0] == expected_model
+    assert 'num_matches' in res
 
 def test_delete_not_supported():
     assert_status(delete_api('model_get_only/'), 405)

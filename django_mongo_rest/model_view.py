@@ -358,7 +358,7 @@ class ModelView(ApiView):
         serialized = serialize(self.model, objs, request)
         return {pluralize(self.model.get_collection_name()): serialized,
                 'objects': serialized, # Temporarily return both model name and objects until ui is migrated
-                'num_maches': num_matches}
+                'num_matches': num_matches}
 
     def extract_request_model(self, request, input_data, allowed_fields, existing=None):
         errors = {}
