@@ -56,13 +56,15 @@ def _extract_embedded_document_list(request, field, input_list, allowed_fields, 
 
 def _display_to_enum(field, val):
     choices = getattr(field, 'choices', None)
-    if choices:
-        choices_dict = {c[1].lower(): c[0] for c in choices}
-        try:
-            return choices_dict[val.lower()]
-        except KeyError:
-            error_msg = 'Must be one of %s' % str([k.lower() for k in choices_dict.keys()])
-            raise ValidationError(errors=error_msg)
+    if not choices:
+        return None
+
+    choices_dict = {c[1].lower(): c[0] for c in choices}
+    try:
+        return choices_dict[val.lower()]
+    except KeyError:
+        error_msg = 'Must be one of %s' % str([k.lower() for k in choices_dict.keys()])
+        raise ValidationError(errors=error_msg)
 
 def _process_value(request, field, val, allowed_fields, permission_exempt_fields):
     if isinstance(field, ReferenceField):
@@ -157,7 +159,7 @@ def _extract_request_model_recursive(model_class, request, input_data, allowed_f
     return doc
 
 Filter = namedtuple('Filter', 'field type_cast preserve_case')
-Filter.__new__.__defaults__ = (lambda x: x, False)
+Filter.__new__.__defaults__ = (None, False)
 
 class ModelView(ApiView):
     duplicate_key_ok = True
@@ -276,16 +278,21 @@ class ModelView(ApiView):
 
             if k in self.filters:
                 flter = self.filters[k]
-                v = flter.type_cast(v)
+                if flter.type_cast:
+                    v = flter.type_cast(v)
                 if isinstance(v, (str, unicode)) and not flter.preserve_case:
                     v = v.lower()
 
+                field = getattr(self.model, flter.field)
                 try:
-                    v = _display_to_enum(getattr(self.model, flter.field), v) or v
-                except ValidationError:
-                    pass
+                    if isinstance(v, list):
+                        v = [_display_to_enum(field, e) or e for e in v]
+                    else:
+                        v = _display_to_enum(field, v) or v
+                except ValidationError as e:
+                    raise ApiException(e.to_dict(), 400)
 
-                query[flter.field] = v
+                query[flter.field] = {'$in': v} if isinstance(v, list) else v
 
     @staticmethod
     def _paginate(request, cursor):
