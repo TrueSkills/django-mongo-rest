@@ -31,11 +31,11 @@ def sign_querystring(querystring, salt, timestamp_override=None):
     return querystring + '&%s=%s' % (SIGNATURE_QUERY_PARAM, _signature(querystring, salt))
 
 def _verify_params_match_query(request):
-    for key, value in request.GET.items():
+    for key, value in request.dmr_params.items():
         if key in (TIMESTAMP_QUERY_PARAM, SIGNATURE_QUERY_PARAM, SALT_QUERY_PARAM):
             continue
 
-        if request.dmr_params.get(key) != value:
+        if key in request.GET and request.GET.get(key) != value:
             '''Url signature is signing one set of params, but POST contains different params.
             Someone is trying to trick us.'''
             raise InvalidSig
