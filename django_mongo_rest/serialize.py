@@ -1,4 +1,5 @@
 from bson import ObjectId
+from copy import deepcopy
 from django_mongo_rest.utils import to_list
 from mongoengine import EmbeddedDocumentField, ListField, ReferenceField, Document
 from mongoengine.base.datastructures import BaseList
@@ -126,6 +127,7 @@ def _serialize(doc_cls, dicts, request, foreign_key_cache, include_fields=None):
         foreign_key_cache = _prefetch_foreign_keys(doc_cls, dicts, fields_to_serialize)
 
     if hasattr(doc_cls, 'serialize_preprocess'):
+        dicts = deepcopy(dicts)
         doc_cls.serialize_preprocess(request, dicts)
 
     res = []
