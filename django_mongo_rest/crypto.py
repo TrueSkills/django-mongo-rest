@@ -35,7 +35,7 @@ def _verify_params_match_query(request):
         if key in (TIMESTAMP_QUERY_PARAM, SIGNATURE_QUERY_PARAM, SALT_QUERY_PARAM):
             continue
 
-        if key in request.GET and request.GET.get(key) != value:
+        if key in request.GET and request.GET.get(key) != str(value):
             '''Url signature is signing one set of params, but POST contains different params.
             Someone is trying to trick us.'''
             raise InvalidSig
