@@ -1,6 +1,7 @@
 import re
 from bson.errors import InvalidId
 from collections import namedtuple
+from datetime import datetime
 from django.http.response import Http404
 from django_mongo_rest.models import FindParams
 from django_mongo_rest.utils import EnumValueError
@@ -19,6 +20,12 @@ EMAIL_REGEX = re.compile(
 def email_validator(value):
     if not EMAIL_REGEX.match(value):
         raise ValueError('Invalid email: %s' % value)
+    return value
+
+def date_validator(value):
+    value = datetime.strptime(value, "%Y-%m-%d")
+    if not value:
+        raise ValueError('Invalid date: %s' % value)
     return value
 
 def date_str_validator(value):
