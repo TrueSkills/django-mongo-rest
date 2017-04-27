@@ -36,7 +36,7 @@ class Enum(enum_Enum):
 
     @classmethod
     def to_display(cls, val):
-        return cls.choices_dict()[val]
+        return cls.choices_dict()[val].lower()
 
     @classmethod
     def reverse(cls, val):
