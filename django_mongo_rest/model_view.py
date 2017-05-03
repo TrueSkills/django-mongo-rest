@@ -350,6 +350,8 @@ class ModelView(ApiView):
             query.update(self.model.allowed_update_query(request))
 
         self._filter(request, query, kwargs)
+        if hasattr(self, 'process_filter'):
+            self.process_filter(request, query)
 
         try:
             cursor = self.model.find(params=params, **query)
