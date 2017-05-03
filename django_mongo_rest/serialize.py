@@ -152,8 +152,6 @@ def _serialize(doc_cls, dicts, request, foreign_key_cache, include_fields=None):
                 continue
             else:
                 fields[display] = _serialize_field(value_cls, value, request, foreign_key_cache)
-                if isinstance(fields[display], ObjectId):
-                    fields[display] = str(fields[display])
         res.append(fields)
 
     if is_multiple:

@@ -1,3 +1,5 @@
+from bson import ObjectId
+from datetime import datetime
 from enum import Enum as enum_Enum
 
 def to_list(x):
@@ -46,3 +48,8 @@ class Enum(enum_Enum):
             return cls.reverse_dict[val.lower()]
         except KeyError:
             raise EnumValueError(cls)
+
+def json_default_serializer(obj):
+    if isinstance(obj, (datetime, ObjectId)):
+        return str(obj)
+    raise Exception('Can\'t serialize {} {}'.format(type(obj), obj))

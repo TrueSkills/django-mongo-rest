@@ -6,7 +6,7 @@ from django.http.response import HttpResponse, Http404, JsonResponse
 from django_mongo_rest import ApiException
 from django_mongo_rest.auth import is_authorized
 from django_mongo_rest.crypto import verify_signature, InvalidSig, ExpiredSig
-from django_mongo_rest.utils import to_list
+from django_mongo_rest.utils import to_list, json_default_serializer
 from django_mongo_rest.validation import get_params
 
 def _enforce_allowed_methods(request, allowed_methods):
@@ -102,7 +102,7 @@ class ApiView(_EndpointView):
         res = self.main(request, *args, **kwargs)
 
         if isinstance(res, dict):
-            res = JsonResponse(res)
+            res = JsonResponse(res, json_dumps_params={'default': json_default_serializer})
         elif res is None:
             res = HttpResponse()
 
