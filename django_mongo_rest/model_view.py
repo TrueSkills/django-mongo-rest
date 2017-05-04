@@ -283,7 +283,7 @@ class ModelView(ApiView):
                 if isinstance(v, (str, unicode)) and not flter.preserve_case:
                     v = v.lower()
 
-                field = getattr(self.model, flter.field)
+                field = getattr(self.model, flter.field, None)
                 try:
                     if isinstance(v, list):
                         v = [_display_to_enum(field, e) or e for e in v]
