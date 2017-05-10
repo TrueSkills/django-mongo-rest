@@ -1,4 +1,3 @@
-from bson import ObjectId
 from copy import deepcopy
 from django_mongo_rest.utils import to_list
 from mongoengine import EmbeddedDocumentField, ListField, ReferenceField, Document

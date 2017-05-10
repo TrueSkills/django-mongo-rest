@@ -50,7 +50,7 @@ def models(request):
 
 def test_get_list_logged_out():
     res = get_api('model_get_only/')
-    assert res.json()['playground_models'] == []
+    assert res.json()['objects'] == []
 
 def clean_expected_model(model):
     '''To match seralized api results'''
@@ -62,7 +62,7 @@ def clean_expected_model(model):
 def test_get_by_id(model, user_session_const):
     _, client = user_session_const
     res = get_api('model_get_only/%s/' % model['_id'], client=client)
-    res = res.json()['playground_model']
+    res = res.json()['object']
     res['_id'] = ObjectId(res.pop('id'))
     clean_expected_model(model)
     assert model == res
@@ -78,7 +78,7 @@ def test_pagination(models, user_session):
 
     res = get_api('model_get_only/?cnt=1&skip=2&sort=id', client=client)
     res = res.json()
-    returned_models = res['playground_models']
+    returned_models = res['objects']
     assert len(returned_models) == 1
 
     expected_model = models[2]
@@ -109,7 +109,7 @@ def test_delete(models, user_session):
 
     # No id - should fetch 2/3 models
     res = get_api('model_get_only/?sort=id&sortDir=-1', client=client)
-    returned_models = res.json()['playground_models']
+    returned_models = res.json()['objects']
     assert len(returned_models) == len(models) - 1
 
     expected_models = list(reversed(models[1:]))
@@ -432,7 +432,9 @@ def test_update_out_of_date(user_session_const, model):
 
     res = res.json()
     assert res['message'] == 'Object is out of date'
-    assert res['new_obj'] == serialize(PlaygroundModel, model, None)
+    expected = serialize(PlaygroundModel, model, None)
+    expected['id'] = str(expected['id'])
+    assert res['new_obj'] == expected
 
 def test_update_null_embedded_doc(user_session_const, model):
     '''Should not be saved'''
