@@ -249,8 +249,7 @@ class ModelView(ApiView):
         obj = get_object_or_404_by_id(self.model, request, obj_id,
                                       enforce_permissions=not request.user.is_superuser)
         serialized = serialize(self.model, obj, request)
-        return {self.model.get_collection_name(): serialized,
-                'object': serialized}  # Temporarily return both model name and objects until ui is migrated
+        return {'object': serialized}
 
     def get_by_ids(self, request, ids):
         try:
@@ -264,8 +263,7 @@ class ModelView(ApiView):
             missing_ids = [i for i in ids if i not in found_ids]
             raise ApiException(', '.join(missing_ids) + ' not found', 404)
         serialized = serialize(self.model, objs, request)
-        return {pluralize(self.model.get_collection_name()): serialized,
-                'objects': serialized}  # Temporarily return both model name and objects until ui is migrated
+        return {'objects': serialized}
 
     def _filter(self, request, query, view_kwargs):
         filter_args = {}
@@ -365,8 +363,7 @@ class ModelView(ApiView):
             objs = list(cursor)
 
         serialized = serialize(self.model, objs, request)
-        return {pluralize(self.model.get_collection_name()): serialized,
-                'objects': serialized, # Temporarily return both model name and objects until ui is migrated
+        return {'objects': serialized,
                 'num_matches': num_matches}
 
     def extract_request_model(self, request, input_data, allowed_fields, existing=None):

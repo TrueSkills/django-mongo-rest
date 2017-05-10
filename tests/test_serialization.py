@@ -112,7 +112,7 @@ def _expected_serialized(test_docs, test_foreign, test_foreign2):
         del doc['identifier']
 
     for doc in test_docs:
-        doc['foreign3_id'] = str(doc.pop('foreign3'))
+        doc['foreign3_id'] = doc.pop('foreign3')
         doc['embedded.val2'] = doc['embedded']['val2']
         del doc['embedded']['val2']
         for embedded in doc['embedded_list']:
