@@ -7,7 +7,7 @@ from django.http.response import Http404
 from django.utils.timezone import now
 from django_mongo_rest import serialize, ApiException, ApiView, audit
 from django_mongo_rest.models import FindParams, UpdateParams, ModelPermissionException
-from django_mongo_rest.shortcuts import get_object_or_404_by_id, get_orm_object_or_404_by_id
+from django_mongo_rest.shortcuts import get_object_or_404, get_orm_object_or_404_by_id
 from django_mongo_rest.utils import pluralize
 from mongoengine import (ReferenceField, StringField, EmbeddedDocumentListField, ListField, BooleanField,
                          ObjectIdField)
@@ -246,15 +246,18 @@ class ModelView(ApiView):
             return self.get_list(request, **kwargs)
 
     def get_by_id(self, request, obj_id):
-        obj = get_object_or_404_by_id(self.model, request, obj_id,
-                                      enforce_permissions=not request.user.is_superuser)
+        query = {'_id': obj_id}
+        self._filter(request, query, {})
+        obj = get_object_or_404(self.model, request, query)
         serialized = serialize(self.model, obj, request)
         return {'object': serialized}
 
     def get_by_ids(self, request, ids):
+        query = {'_id': {'$in': ids}}
+        self._filter(request, query, {})
+        params = FindParams(request=None if request.user.is_superuser else request)
         try:
-            params = FindParams(request=None if request.user.is_superuser else request)
-            objs = list(self.model.find(params=params, id={'$in': ids}))
+            objs = list(self.model.find(params=params, **query))
         except ModelPermissionException:
             raise ApiException(self.model.msg404(), 404)
 
@@ -291,6 +294,9 @@ class ModelView(ApiView):
                     raise ApiException(e.to_dict(), 400)
 
                 query[flter.field] = {'$in': v} if isinstance(v, list) else v
+
+        if hasattr(self, 'process_filter'):
+            self.process_filter(request, query)
 
     @staticmethod
     def _paginate(request, cursor):
@@ -348,8 +354,6 @@ class ModelView(ApiView):
             query.update(self.model.allowed_update_query(request))
 
         self._filter(request, query, kwargs)
-        if hasattr(self, 'process_filter'):
-            self.process_filter(request, query)
 
         try:
             cursor = self.model.find(params=params, **query)
