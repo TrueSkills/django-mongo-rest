@@ -13,12 +13,12 @@ def pluralize(s):
     return s + 's'
 
 # http://stackoverflow.com/questions/27973988/python-how-to-remove-all-empty-fields-in-a-nested-dict
-def purge_empty_values(d):
+def purge_empty_values(d, ignore=[]):
     if not isinstance(d, (dict, list)):
         return d
     if isinstance(d, list):
         return [v for v in (purge_empty_values(v) for v in d) if v]
-    return {k: v for k, v in ((k, purge_empty_values(v)) for k, v in d.items()) if v}
+    return {k: v for k, v in ((k, purge_empty_values(v)) for k, v in d.items()) if v or k in ignore}
 
 class EnumValueError(ValueError):
     def __init__(self, enum_cls):
