@@ -1,6 +1,7 @@
 from copy import deepcopy
 from django.http.response import HttpResponse
-from django_mongo_rest import ApiView, PageView, PERMISSION
+from django_mongo_rest import ApiView, PageView
+from django_mongo_rest.auth import PERMISSION
 from django_mongo_rest.validation import Param, email_validator
 from django_mongo_rest.model_view import ModelView
 from .models import PlaygroundModel

@@ -93,7 +93,7 @@ SESSION_SERIALIZER = 'django_mongoengine.sessions.BSONSerializer'
 
 AUTHENTICATION_BACKENDS = (
     'django_mongoengine.mongo_auth.backends.MongoEngineBackend',
-    'django_mongo_rest.auth.PasswordlessAuthBackend',
+    'django_mongo_rest.backends.PasswordlessAuthBackend',
 )
 
 AUTH_USER_MODEL = 'mongo_auth.MongoUser'
@@ -137,4 +137,5 @@ USE_TZ = True
 
 STATIC_URL = '/static/'
 
-MONGODB = getattr(connection.connect(MONGODB_DATABASES['default']['name'], tz_aware=USE_TZ), MONGODB_DATABASES['default']['name'])
+connection.connect(MONGODB_DATABASES['default']['name'], tz_aware=USE_TZ)
+MONGODB = connection.get_db('default')

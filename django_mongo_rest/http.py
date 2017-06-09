@@ -1,6 +1,5 @@
 import json
 from django.conf import settings
-from django.contrib.auth.views import redirect_to_login
 from django.shortcuts import redirect
 from django.http.response import HttpResponse, Http404, JsonResponse
 from django_mongo_rest import ApiException
@@ -136,6 +135,7 @@ class PageView(_EndpointView):
                 raise Http404()
 
             path = request.get_full_path()
+            from django.contrib.auth.views import redirect_to_login
             return redirect_to_login(path, settings.LOGIN_URL, 'next')
 
     def main_wrapper(self, request, *args, **kwargs):
