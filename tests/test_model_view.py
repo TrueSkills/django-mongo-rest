@@ -2,6 +2,7 @@ import calendar
 from copy import deepcopy
 from datetime import datetime, timedelta
 from django.utils.timezone import now
+import threading
 
 import pytest
 import pytz
@@ -201,7 +202,7 @@ def test_post_less_than_equal_to(user_session_const):
     assert_status(res, 400)
     assert res.json()['message'] == {'integer_immutable': 'Must be <= integer'}
 
-def _assert_models_equal(user, expected, actual):
+def _assert_models_equal(user, expected, actual, is_update=False):
     actual = deepcopy(actual)
     expected = deepcopy(expected)
 
@@ -210,8 +211,9 @@ def _assert_models_equal(user, expected, actual):
     assert datetime.utcnow().replace(tzinfo=pytz.utc) - actual.pop('last_updated') < timedelta(seconds=1)
     expected.pop('last_updated', None)
     expected.pop('not_editable', None)
-    expected.setdefault('default_required', 7)
-    expected.setdefault('default_optional', 20)
+    if not is_update:
+        expected.setdefault('default_required', 7)
+        expected.setdefault('default_optional', 20)
 
     assert expected == actual
 
@@ -366,7 +368,7 @@ def _verify_update(user, client, model, expected_model=None):
     if 'boolean' in expected_model and expected_model['boolean'] is None:
         del expected_model['boolean']
 
-    _assert_models_equal(user, expected_model, db_model)
+    _assert_models_equal(user, expected_model, db_model, is_update=True)
 
     del model['decimal']
 
@@ -471,4 +473,27 @@ def test_unset(user_session_const, model):
 
     del model['integer']
     del model['embedded_list']
-    _assert_models_equal(user, model, db_model)
+    _assert_models_equal(user, model, db_model, is_update=True)
+
+def test_simultaneous_updates(user_session_const, model):
+    '''They should not interfere with each other'''
+    user, client = user_session_const
+
+    updates = {
+        'string': model['string'] + 'a',
+        'integer': model['integer'] + 1
+    }
+    
+    def make_request(updates):
+        assert_status(patch_api('model/%s/?dmr_sleep=0.1' % model['_id'], client=client, data=updates))
+
+    t1 = threading.Thread(target=make_request, args=({'string': updates['string']},))
+    t2 = threading.Thread(target=make_request, args=({'integer': updates['integer']},))
+    t1.start()
+    t2.start()
+    t1.join()
+    t2.join()
+
+    db_model = PlaygroundModel.find_by_id(model['_id'])
+    model.update(updates)
+    _assert_models_equal(user, model, db_model, is_update=True)

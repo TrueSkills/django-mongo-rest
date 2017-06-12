@@ -7,13 +7,15 @@ from django.http.response import Http404
 from django.utils.timezone import now
 from django_mongo_rest import serialize, ApiException, ApiView, audit
 from django_mongo_rest.models import FindParams, UpdateParams, ModelPermissionException
-from django_mongo_rest.shortcuts import get_object_or_404, get_orm_object_or_404_by_id
+from django_mongo_rest.shortcuts import (get_object_or_404, get_orm_object_or_404_by_id,
+                                         get_object_or_404_by_id)
 from django_mongo_rest.utils import pluralize
 from mongoengine import (ReferenceField, StringField, EmbeddedDocumentListField, ListField, BooleanField,
                          ObjectIdField)
 from mongoengine.errors import ValidationError
 from pymongo.errors import DuplicateKeyError
 from six import string_types
+from time import sleep
 
 model_registry = {}
 
@@ -140,8 +142,6 @@ def _extract_request_model_recursive(model_class, request, input_data, allowed_f
         for name, field in model_class._fields.iteritems():
             _extract_request_model_field(request, doc, input_data, field, allowed_fields, errors, changed_fields,
                                          permission_exempt_fields)
-
-    doc.last_updated = now()
 
     for name, field in model_class._fields.iteritems():
         if hasattr(field, 'less_than_equal_to'):
@@ -390,6 +390,9 @@ class ModelView(ApiView):
         except NotImplementedError:
             pass
 
+        if request.GET.get('dmr_sleep'):  # for testing race conditions
+            sleep(float(request.GET['dmr_sleep']))
+
         return doc
 
     def _prune_uneditable_fields(self, doc, allowed_fields):
@@ -435,6 +438,8 @@ class ModelView(ApiView):
         except ValidationError as e:
             raise ApiException(e.to_dict(), 400)
 
+        obj['last_updated'] = now()
+
         try:
             self.auto_populate_new_model(request, obj)
         except NotImplementedError:
@@ -470,16 +475,18 @@ class ModelView(ApiView):
             raise ApiException(e.to_dict(), 400)
 
         unset = []
-        for field_name, field in self.model._fields.iteritems():
-            val = request.dmr_params.get(field_name, True)
+        query = {'last_updated': now()}
+        for field_name in request.model_view_changed_fields:
+            val = obj.get(field_name)
             if val is None or val == []:
                 unset.append(field_name)
+            else:
+                query[field_name] = val
 
         update_params = UpdateParams(request=None if request.user.is_superuser else request, unset=unset)
 
         try:
-            del obj['_id'] # Don't try to update this
-            res = self.model.update_by_id(obj_id, update_params=update_params, **obj)
+            res = self.model.update_by_id(obj_id, update_params=update_params, **query)
         except ModelPermissionException:
             raise ApiException(self.model.msg404(), 400)
         except DuplicateKeyError:
