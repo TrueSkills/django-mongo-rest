@@ -101,13 +101,17 @@ def _process_value(request, field, val, allowed_fields, permission_exempt_fields
 
     return val
 
-def _extract_request_model_field(request, doc, input_data, field, allowed_fields, errors,
+def _validate_field(field, val):
+    field.validate(val)
+    if hasattr(field, 'validator') and val is not None:
+        val = field.validator(val)
+    return val
+
+def _extract_request_model_field(request, input_data, field, allowed_fields, errors,
                                  permission_exempt_fields):
     # pylint: disable=too-many-arguments
-    if hasattr(allowed_fields, '__call__'):
-        allowed_fields = allowed_fields(request, doc.to_mongo())
     if field.name not in allowed_fields or field.name not in input_data:
-        return
+        return None, False
 
     val = input_data[field.name]
 
@@ -115,25 +119,44 @@ def _extract_request_model_field(request, doc, input_data, field, allowed_fields
         val = _process_value(request, field, val, allowed_fields, permission_exempt_fields)
     except ValidationError as e:
         errors[field.name] = e.errors
-        return
+        return None, False
 
-    if hasattr(field, 'validator') and val is not None:
-        try:
-            val = field.validator(val)
-        except ValueError as e:
-            errors[field.name] = e
-            return
+    return val, True
 
-    setattr(doc, field.name, val)
+def _extract_request_query_recursive(model_class, doc, request, input_data, allowed_fields, errors,
+                                     permission_exempt_fields):
+    # pylint: disable=too-many-arguments
+    query = {}
+
+    if hasattr(allowed_fields, '__call__'):
+        allowed_fields = allowed_fields(request, doc.to_mongo())
+
+    for allowed_field in allowed_fields:
+        field = model_class._fields[allowed_field]
+        val, extracted = _extract_request_model_field(request, input_data, field, allowed_fields,
+                                                      errors, permission_exempt_fields)
+        if not extracted:
+            continue
+
+        if val is not None:
+            try:
+                val = _validate_field(field, val)
+            except (ValueError, ValidationError) as e:
+                errors[field.name] = e.message
+
+        query[field.name] = val
+
+    return query
 
 def _extract_request_model_recursive(model_class, request, input_data, allowed_fields, errors,
                                      permission_exempt_fields, existing=None):
     # pylint: disable=too-many-arguments
     doc = deepcopy(existing) or model_class()
     if input_data:
-        for field in model_class._fields.itervalues():
-            _extract_request_model_field(request, doc, input_data, field, allowed_fields, errors,
-                                         permission_exempt_fields)
+        query = _extract_request_query_recursive(model_class, doc, request, input_data, allowed_fields,
+                                                 errors, permission_exempt_fields)
+        for k, v in query.iteritems():
+            setattr(doc, k, v)
 
     try:
         doc.validate()
