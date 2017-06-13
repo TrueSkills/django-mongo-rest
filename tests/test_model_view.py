@@ -196,7 +196,7 @@ def _assert_models_equal(user, expected, actual, is_update=False):
 
     expected.setdefault('_id', actual['_id'])
     expected['created_by'] = user['_id']
-    assert datetime.utcnow().replace(tzinfo=pytz.utc) - actual.pop('last_updated') < timedelta(seconds=1)
+    assert datetime.utcnow().replace(tzinfo=pytz.utc) - actual.pop('last_updated') < timedelta(seconds=2)
     expected.pop('last_updated', None)
     expected.pop('not_editable', None)
     if not is_update:

@@ -101,7 +101,7 @@ def _process_value(request, field, val, allowed_fields, permission_exempt_fields
 
     return val
 
-def _extract_request_model_field(request, doc, input_data, field, allowed_fields, errors, changed_fields,
+def _extract_request_model_field(request, doc, input_data, field, allowed_fields, errors,
                                  permission_exempt_fields):
     # pylint: disable=too-many-arguments
     if hasattr(allowed_fields, '__call__'):
@@ -124,23 +124,15 @@ def _extract_request_model_field(request, doc, input_data, field, allowed_fields
             errors[field.name] = e
             return
 
-    existing_val = getattr(doc, field.name, None)
-    # Convert field.to_python because some fields, such as DecimalField, won't be equal otherwise
-    # Decimal('3.33000000000000000000') != 3.33
-    isNone = val is None
-    if (isNone and existing_val is not None or
-            not isNone and getattr(doc, field.name, None) != field.to_python(val)):
-        changed_fields.append(field.name)
-
     setattr(doc, field.name, val)
 
 def _extract_request_model_recursive(model_class, request, input_data, allowed_fields, errors,
-                                     changed_fields, permission_exempt_fields, existing=None):
+                                     permission_exempt_fields, existing=None):
     # pylint: disable=too-many-arguments
-    doc = existing or model_class()
+    doc = deepcopy(existing) or model_class()
     if input_data:
-        for name, field in model_class._fields.iteritems():
-            _extract_request_model_field(request, doc, input_data, field, allowed_fields, errors, changed_fields,
+        for field in model_class._fields.itervalues():
+            _extract_request_model_field(request, doc, input_data, field, allowed_fields, errors,
                                          permission_exempt_fields)
 
     try:
@@ -363,11 +355,27 @@ class ModelView(ApiView):
         return {'objects': serialized,
                 'num_matches': num_matches}
 
+    def compute_changed_fields(self, request, existing_doc, new_doc, explicit=True):
+        changed_fields = []
+
+        for field in self.model._fields.itervalues():
+            if explicit and field.name not in request.dmr_params:
+                continue
+
+            existing_val = existing_doc.get(field.name)
+            new_val = new_doc.get(field.name)
+
+            isNone = new_val is None
+            if (isNone and existing_val is not None or
+                    not isNone and existing_val != new_val):
+                changed_fields.append(field.name)
+
+        return changed_fields
+
     def extract_request_model(self, request, input_data, allowed_fields, existing=None):
         errors = {}
-        changed_fields = []
         doc = _extract_request_model_recursive(self.model, request, input_data, allowed_fields,
-                                               errors, changed_fields, self.permission_exempt_fields,
+                                               errors, self.permission_exempt_fields,
                                                existing=existing)
 
         if errors:
@@ -377,7 +385,9 @@ class ModelView(ApiView):
 
         remove_empty_lists(doc)
 
-        request.model_view_changed_fields = changed_fields
+        existing = existing.to_mongo() if existing else {}
+        request.model_view_changed_fields = self.compute_changed_fields(request, existing, doc)
+
         try:
             self.post_process_model(request, doc)
         except NotImplementedError:
@@ -469,7 +479,7 @@ class ModelView(ApiView):
 
         unset = []
         query = {'last_updated': now()}
-        for field_name in request.model_view_changed_fields:
+        for field_name in self.compute_changed_fields(request, existing_model.to_mongo(), obj, explicit=False):
             val = obj.get(field_name)
             if val is None or val == []:
                 unset.append(field_name)
