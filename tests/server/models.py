@@ -49,7 +49,7 @@ class PlaygroundModel(BaseModel):
     serialize_fields = (('_id', 'id'), 'string', 'integer', 'decimal', 'embedded_list')
     string = StringField(max_length=10, min_length=3, required=True)
     integer = IntField(min_value=4, max_value=100)
-    integer_immutable = IntField(min_value=4, max_value=10, less_than_equal_to='integer')
+    integer_immutable = IntField(min_value=4, max_value=10)
     integer_auto_populated = IntField(min_value=4, max_value=10)
     not_editable = IntField(min_value=4, max_value=10)
     ref = ReferenceField('PlaygroundModel')

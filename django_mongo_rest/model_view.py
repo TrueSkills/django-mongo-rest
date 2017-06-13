@@ -143,13 +143,6 @@ def _extract_request_model_recursive(model_class, request, input_data, allowed_f
             _extract_request_model_field(request, doc, input_data, field, allowed_fields, errors, changed_fields,
                                          permission_exempt_fields)
 
-    for name, field in model_class._fields.iteritems():
-        if hasattr(field, 'less_than_equal_to'):
-            greater_field = field.less_than_equal_to
-            if (hasattr(doc, name) and hasattr(doc, greater_field) and
-                    getattr(doc, name) > getattr(doc, greater_field)):
-                errors[name] = 'Must be <= %s' % greater_field
-
     try:
         doc.validate()
     except ValidationError as e:

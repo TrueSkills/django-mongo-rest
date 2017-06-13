@@ -190,18 +190,6 @@ def test_custom_validator(user_session_const):
     expected_msg = {'embedded_list': {'0': {'start_date': 'Invalid year: 4'}}}
     assert res.json()['message'] == expected_msg
 
-def test_post_less_than_equal_to(user_session_const):
-    _, client = user_session_const
-    expected = {
-        'integer': 6,
-        'integer_immutable': 7,
-        'string': 'abc'
-    }
-
-    res = post_api('model/', client=client, data=expected)
-    assert_status(res, 400)
-    assert res.json()['message'] == {'integer_immutable': 'Must be <= integer'}
-
 def _assert_models_equal(user, expected, actual, is_update=False):
     actual = deepcopy(actual)
     expected = deepcopy(expected)
