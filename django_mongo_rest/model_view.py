@@ -35,6 +35,11 @@ def remove_empty_lists(doc):
         elif isinstance(v, dict):
             remove_empty_lists(v)
 
+def _to_mongo(doc):
+    doc = doc.to_mongo()
+    remove_empty_lists(doc)
+    return doc
+
 def _extract_embedded_document_list(request, field, input_list, allowed_fields, permission_exempt_fields):
     if not isinstance(input_list, list):
         raise ValidationError(errors='expected array')
@@ -101,6 +106,7 @@ def _process_value(request, field, val, allowed_fields, permission_exempt_fields
             except KeyError:
                 error_msg = 'Must be one of %s' % str([k.lower() for k in choices_dict.keys()])
                 raise ValidationError(errors=error_msg)
+        val = [field.field.to_python(v) for v in val]
 
     return val
 
@@ -407,11 +413,8 @@ class ModelView(ApiView):
         if errors:
             raise ValidationError('Validation Error', errors=errors)
 
-        doc = doc.to_mongo()
-
-        remove_empty_lists(doc)
-
-        existing = existing.to_mongo() if existing else {}
+        doc = _to_mongo(doc)
+        existing = _to_mongo(existing) if existing else {}
         request.model_view_changed_fields = self.compute_changed_fields(request, existing, doc)
 
         try:
@@ -513,7 +516,7 @@ class ModelView(ApiView):
                 query[k] = {'$each': v}
 
         if errors:
-            raise ValidationError(errors={op: errors})
+            raise ValidationError(errors=errors)
 
         return query
 
@@ -534,6 +537,8 @@ class ModelView(ApiView):
         except ValidationError as e:
             errors.update(e.errors)
 
+        existing_keys = set(query.keys())
+
         for op in ('$push', '$pull', '$addToSet'):
             if not request.dmr_params.get(op):
                 continue
@@ -542,17 +547,29 @@ class ModelView(ApiView):
                 query[op] = self._extract_array_query(request, op, existing_model)
             except ValidationError as e:
                 errors[op] = e.errors
+            else:
+                for k in query[op]:
+                    if k in existing_keys:
+                        errors[k] = 'Appears twice'
+                    existing_keys.add(k)
 
         if errors:
-            raise ApiException(e.to_dict(), 400)
+            raise ApiException(ValidationError(errors=errors).to_dict(), 400)
 
         unset = []
-        for field_name in self.compute_changed_fields(request, existing_model.to_mongo(), obj, explicit=False):
+        for field_name in self.compute_changed_fields(request, _to_mongo(existing_model), obj, explicit=False):
             val = obj.get(field_name)
             if val is None or val == []:
                 unset.append(field_name)
             else:
                 query[field_name] = val
+
+            if field_name in existing_keys:
+                errors[field_name] = 'Appears twice'
+            existing_keys.add(field_name)
+
+        if errors:
+            raise ApiException(ValidationError(errors=errors).to_dict(), 400)
 
         update_params = UpdateParams(request=None if request.user.is_superuser else request, unset=unset)
 

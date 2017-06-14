@@ -514,6 +514,18 @@ def test_push(user_session_const, model):
 def test_push_multiple(user_session_const, model):
     _push(user_session_const, model, [{'embedded_string': '63'}, {'embedded_string': '66'}])
 
+def test_push_to_null_field(user_session_const, model):
+    MONGODB.playground_model.update_one({'_id': model['_id']}, {'$unset': {'embedded_list': 1}})
+    model['embedded_list'] = []
+    _push(user_session_const, model, [{'embedded_string': '63'}])
+    
+def test_push_and_set(user_session_const, model):
+    _, client = user_session_const
+    model['embedded_list'] = [{'embedded_string': '66'}]
+    model['$push'] = {'embedded_list': [{'embedded_string': '63'}]}
+    res = _update(client, model, expected_status=400)
+    assert res.json()['message'] == {'embedded_list': 'Appears twice'}
+
 def test_push_validation(user_session_const, model):
     _, client = user_session_const
     model['$push'] = {'embedded_list': [{'start_date': 'abc'}, {}]}
