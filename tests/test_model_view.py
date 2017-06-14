@@ -342,11 +342,13 @@ def test_embedded_doc_list_extra_field(user_session_const):
 
     _verify_created_model(user, client, expected, clean_expected_func=clean_expected)
 
-def _verify_update(user, client, model, expected_model=None):
-    model = deepcopy(model)
+def _update(client, model, expected_status=200):
     model['last_updated'] = calendar.timegm(model['last_updated'].timetuple())  # api expects unix timestamp
     res = patch_api('model/%s/' % model['_id'], client=client, data=model)
-    assert_status(res)
+    assert_status(res, expected_status=expected_status)
+    return res
+
+def _verify_update(user, model, expected_model=None):
     db_model = PlaygroundModel.find_by_id(model['_id'])
 
     expected_model = expected_model or model
@@ -359,6 +361,11 @@ def _verify_update(user, client, model, expected_model=None):
     _assert_models_equal(user, expected_model, db_model, is_update=True)
 
     del model['decimal']
+
+def _update_and_verify(user, client, model, expected_model=None):
+    model = deepcopy(model)
+    _update(client, model)
+    _verify_update(user, model, expected_model)
 
 def test_update(user_session_const, model):
     user, client = user_session_const
@@ -373,7 +380,7 @@ def test_update(user_session_const, model):
         {'embedded_string': '4'}
     ]
 
-    _verify_update(user, client, model)
+    _update_and_verify(user, client, model)
     del model['field_should_be_ignored']
     del model['integer_immutable']
     del model['decimal']
@@ -382,7 +389,7 @@ def test_update(user_session_const, model):
 def test_update_true_bools_saved(user_session_const, model):
     user, client = user_session_const
     model['boolean'] = True
-    _verify_update(user, client, model)
+    _update_and_verify(user, client, model)
     _assert_audit_log({
         '_id': model['_id'],
         'boolean': True
@@ -392,7 +399,7 @@ def test_update_false_bools(user_session_const, model):
     user, client = user_session_const
     MONGODB.playground_model.update_one({'_id': model['_id']}, {'$set': {'boolean': True}})
     model['boolean'] = False
-    _verify_update(user, client, model)
+    _update_and_verify(user, client, model)
     _assert_audit_log({
         '_id': model['_id'],
         'boolean': False
@@ -434,7 +441,7 @@ def test_update_null_embedded_doc(user_session_const, model):
     }]
     expected_model = deepcopy(model)
     expected_model['embedded_list_optional'] = model['embedded_list_optional'][1:]
-    _verify_update(user, client, model, expected_model=expected_model)
+    _update_and_verify(user, client, model, expected_model=expected_model)
     _assert_audit_log({
         '_id': model['_id'],
         'embedded_list_optional': [{
@@ -446,10 +453,8 @@ def test_unset(user_session_const, model):
     user, client = user_session_const
     model['integer'] = None
     model['embedded_list'] = []
-    del model['last_updated']
 
-    assert_status(patch_api('model/%s/' % model['_id'], client=client, data=model))
-
+    _update(client, model)
     db_model = PlaygroundModel.find_by_id(model['_id'])
 
     expected_changes = {
@@ -485,3 +490,86 @@ def test_simultaneous_updates(user_session_const, model):
     db_model = PlaygroundModel.find_by_id(model['_id'])
     model.update(updates)
     _assert_models_equal(user, model, db_model, is_update=True)
+
+def _push(user_session_const, model, data):
+    user, client = user_session_const
+    model['$push'] = {'embedded_list': data}
+    _update(client, model)
+
+    db_model = PlaygroundModel.find_by_id(model['_id'])
+
+    expected_changes = {
+        'embedded_list': model['embedded_list'] + data,
+    }
+    model.update(expected_changes)
+    del model['$push']
+
+    _assert_models_equal(user, model, db_model, is_update=True)
+    expected_changes['_id'] = model['_id']
+    _assert_audit_log(expected_changes, user['_id'], 'U')
+
+def test_push(user_session_const, model):
+    _push(user_session_const, model, [{'embedded_string': '63'}])
+    
+def test_push_multiple(user_session_const, model):
+    _push(user_session_const, model, [{'embedded_string': '63'}, {'embedded_string': '66'}])
+
+def test_push_validation(user_session_const, model):
+    _, client = user_session_const
+    model['$push'] = {'embedded_list': [{'start_date': 'abc'}, {}]}
+    res = _update(client, model, expected_status=400)
+    assert res.json()['message'] == {'$push': {'embedded_list': {
+        '0': {
+            'embedded_string': 'Field is required',
+            'start_date': 'Invalid date, expected "mm-yyyy" or "yyyy": abc'
+        }, '1': {
+            'embedded_string': 'Field is required',
+        }
+    }}}
+
+def test_push_single_val(user_session_const, model):
+    _, client = user_session_const
+    model['$push'] = {'embedded_list': {'embedded_string': '63'}}
+    res = _update(client, model, expected_status=400)
+    assert res.json()['message'] == {'$push': {'embedded_list': 'expected array'}}
+
+def test_push_to_non_list_field(user_session_const, model):
+    _, client = user_session_const
+    model['$push'] = {'integer': {'embedded_string': '63'}}
+    res = _update(client, model, expected_status=400)
+    assert res.json()['message'] == {'$push': {'integer': 'integer is not an array, $push not supported'}}
+
+def test_pull(user_session_const, model):
+    user, client = user_session_const
+    model['$pull'] = {'embedded_list': model['embedded_list'][:1]}
+    _update(client, model)
+
+    db_model = PlaygroundModel.find_by_id(model['_id'])
+
+    expected_changes = {
+        'embedded_list': model['embedded_list'][1:],
+    }
+    model.update(expected_changes)
+    del model['$pull']
+
+    _assert_models_equal(user, model, db_model, is_update=True)
+    expected_changes['_id'] = model['_id']
+    _assert_audit_log(expected_changes, user['_id'], 'U')
+
+def test_add_to_set(user_session_const, model):
+    user, client = user_session_const
+    data = [{'embedded_string': '63'}]
+    model['$addToSet'] = {'embedded_list': data}
+    _update(client, model)
+
+    db_model = PlaygroundModel.find_by_id(model['_id'])
+
+    expected_changes = {
+        'embedded_list': model['embedded_list'] + data,
+    }
+    model.update(expected_changes)
+    del model['$addToSet']
+
+    _assert_models_equal(user, model, db_model, is_update=True)
+    expected_changes['_id'] = model['_id']
+    _assert_audit_log(expected_changes, user['_id'], 'U')

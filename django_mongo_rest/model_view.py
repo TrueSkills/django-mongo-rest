@@ -1,6 +1,6 @@
 import pytz
 from bson import ObjectId
-from collections import namedtuple
+from collections import namedtuple, defaultdict
 from copy import deepcopy
 from datetime import datetime
 from django.http.response import Http404
@@ -10,8 +10,7 @@ from django_mongo_rest.models import FindParams, UpdateParams, ModelPermissionEx
 from django_mongo_rest.shortcuts import (get_object_or_404, get_orm_object_or_404_by_id,
                                          get_object_or_404_by_id)
 from django_mongo_rest.utils import pluralize
-from mongoengine import (ReferenceField, StringField, EmbeddedDocumentListField, ListField, BooleanField,
-                         ObjectIdField)
+from mongoengine import (ReferenceField, StringField, EmbeddedDocumentListField, ListField, ObjectIdField)
 from mongoengine.errors import ValidationError
 from pymongo.errors import DuplicateKeyError
 from six import string_types
@@ -37,6 +36,8 @@ def remove_empty_lists(doc):
             remove_empty_lists(v)
 
 def _extract_embedded_document_list(request, field, input_list, allowed_fields, permission_exempt_fields):
+    if not isinstance(input_list, list):
+        raise ValidationError(errors='expected array')
     document_type = field.field.document_type
     the_list = []
     errors = {}
@@ -90,6 +91,8 @@ def _process_value(request, field, val, allowed_fields, permission_exempt_fields
                                                permission_exempt_fields)
 
     elif isinstance(field, ListField):
+        if not isinstance(val, list):
+            raise ValidationError(errors='expected array')
         choices = getattr(field.field, 'choices', None)
         if choices:
             choices_dict = {c[1].lower(): c[0] for c in choices}
@@ -487,6 +490,34 @@ class ModelView(ApiView):
 
         return {'id': str(obj['_id'])}
 
+    def _extract_array_query(self, request, op, existing_doc):
+        if not isinstance(request.dmr_params[op], dict):
+            raise ValidationError(errors={op: 'expected object'})
+
+        errors = defaultdict(dict)
+        query = _extract_request_query_recursive(self.model, existing_doc, request, request.dmr_params[op], self.editable_fields,
+                                         errors, self.permission_exempt_fields)
+
+        for k, v in query.iteritems():
+            if not isinstance(self.model._fields[k], ListField):
+                errors[k] = '%s is not an array, %s not supported' % (k, op)
+                continue
+
+            if isinstance(self.model._fields[k], EmbeddedDocumentListField):
+                v = [v.to_mongo() for v in v]
+
+            request.model_view_changed_fields.append(k)
+            if op == '$pull':
+                query[k] = {'$or': v}
+            else:
+                query[k] = {'$each': v}
+
+        if errors:
+            raise ValidationError(errors={op: errors})
+
+        return query
+
+
     def update(self, request, obj_id):
         if not obj_id:
             raise Http404()
@@ -494,14 +525,28 @@ class ModelView(ApiView):
         existing_model = get_orm_object_or_404_by_id(self.model, request, obj_id)
         self._refuse_conflicting_update(request.dmr_params, request, existing_model)
 
+        errors = {}
+        query = {'last_updated': now()}
+
         try:
             obj = self.extract_request_model(request, request.dmr_params, self.editable_fields,
                                              existing=existing_model)
         except ValidationError as e:
+            errors.update(e.errors)
+
+        for op in ('$push', '$pull', '$addToSet'):
+            if not request.dmr_params.get(op):
+                continue
+
+            try:
+                query[op] = self._extract_array_query(request, op, existing_model)
+            except ValidationError as e:
+                errors[op] = e.errors
+
+        if errors:
             raise ApiException(e.to_dict(), 400)
 
         unset = []
-        query = {'last_updated': now()}
         for field_name in self.compute_changed_fields(request, existing_model.to_mongo(), obj, explicit=False):
             val = obj.get(field_name)
             if val is None or val == []:
@@ -512,7 +557,7 @@ class ModelView(ApiView):
         update_params = UpdateParams(request=None if request.user.is_superuser else request, unset=unset)
 
         try:
-            res = self.model.update_by_id(obj_id, update_params=update_params, **query)
+            updated = self.model.find_one_and_update({'_id': obj_id}, query, update_params=update_params)
         except ModelPermissionException:
             raise ApiException(self.model.msg404(), 400)
         except DuplicateKeyError:
@@ -522,9 +567,9 @@ class ModelView(ApiView):
                 obj['_id'] = ObjectId(obj_id)
             else:
                 obj['_id'] = obj_id
-            self._create_audit_log(request, obj, audit.ACTIONS.UPDATE, self.editable_fields)
+            self._create_audit_log(request, updated, audit.ACTIONS.UPDATE, self.editable_fields)
 
-        if not res.matched_count:
+        if not updated:
             raise ApiException(self.model.msg404(), 404)
 
     def _refuse_conflicting_update(self, input_data, request, existing_model):
