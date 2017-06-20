@@ -257,8 +257,8 @@ class ModelView(ApiView):
     def get(self, request, obj_id, **kwargs):
         if obj_id:
             return self.get_by_id(request, obj_id)
-        elif request.GET.get('ids', []):
-            return self.get_by_ids(request, request.GET['ids'])
+        elif request.GET.get('ids'):
+            return self.get_by_ids(request, request.GET['ids'].split(','))
         else:
             return self.get_list(request, **kwargs)
 
