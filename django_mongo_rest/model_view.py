@@ -278,7 +278,7 @@ class ModelView(ApiView):
         except ModelPermissionException:
             raise ApiException(self.model.msg404(), 404)
 
-        if len(objs != len(ids)):
+        if len(objs) != len(ids):
             found_ids = {str(obj['_id']) for obj in objs}
             missing_ids = [i for i in ids if i not in found_ids]
             raise ApiException(', '.join(missing_ids) + ' not found', 404)
