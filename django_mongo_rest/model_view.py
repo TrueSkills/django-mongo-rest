@@ -74,10 +74,10 @@ def _display_to_enum(field, val):
         error_msg = 'Must be one of %s' % str([k.lower() for k in choices_dict.keys()])
         raise ValidationError(errors=error_msg)
 
-def _process_value(request, field, val, allowed_fields, permission_exempt_fields):
+def _process_value(request, field, display_name, val, allowed_fields, permission_exempt_fields):
     if isinstance(field, ReferenceField):
         kwargs = {}
-        if field.name not in permission_exempt_fields:
+        if display_name not in permission_exempt_fields:
             kwargs['request'] = request
 
         if not field.document_type.exists(id=val, **kwargs):
@@ -92,7 +92,7 @@ def _process_value(request, field, val, allowed_fields, permission_exempt_fields
         if enum_val:
             return enum_val
     elif isinstance(field, EmbeddedDocumentListField):
-        return _extract_embedded_document_list(request, field, val or [], allowed_fields[field.name],
+        return _extract_embedded_document_list(request, field, val or [], allowed_fields[display_name],
                                                permission_exempt_fields)
 
     elif isinstance(field, ListField):
@@ -116,18 +116,18 @@ def _validate_field(field, val):
         val = field.validator(val)
     return val
 
-def _extract_request_model_field(request, input_data, field, allowed_fields, errors,
+def _extract_request_model_field(request, input_data, field, display_name, allowed_fields, errors,
                                  permission_exempt_fields):
     # pylint: disable=too-many-arguments
-    if field.name not in allowed_fields or field.name not in input_data:
+    if display_name not in allowed_fields or display_name not in input_data:
         return None, False
 
-    val = input_data[field.name]
+    val = input_data[display_name]
 
     try:
-        val = _process_value(request, field, val, allowed_fields, permission_exempt_fields)
+        val = _process_value(request, field, display_name, val, allowed_fields, permission_exempt_fields)
     except ValidationError as e:
-        errors[field.name] = e.errors
+        errors[display_name] = e.errors
         return None, False
 
     return val, True
@@ -140,10 +140,16 @@ def _extract_request_query_recursive(model_class, doc, request, input_data, allo
     if hasattr(allowed_fields, '__call__'):
         allowed_fields = allowed_fields(request, doc.to_mongo())
 
-    for allowed_field in allowed_fields:
-        field = model_class._fields[allowed_field]
-        val, extracted = _extract_request_model_field(request, input_data, field, allowed_fields,
-                                                      errors, permission_exempt_fields)
+    field_name_map = {}
+    for sf in getattr(model_class, 'serialize_fields', []):
+        if isinstance(sf, (list, tuple)):
+            field_name_map[sf[1]] = sf[0]
+
+    for display_name in allowed_fields:
+        field_name = field_name_map.get(display_name, display_name)
+        field = model_class._fields[field_name]
+        val, extracted = _extract_request_model_field(request, input_data, field, display_name,
+                                                      allowed_fields, errors, permission_exempt_fields)
         if not extracted:
             continue
 
@@ -151,7 +157,7 @@ def _extract_request_query_recursive(model_class, doc, request, input_data, allo
             try:
                 val = _validate_field(field, val)
             except (ValueError, ValidationError) as e:
-                errors[field.name] = e.message
+                errors[display_name] = e.message
 
         query[field.name] = val
 
@@ -226,7 +232,7 @@ class ModelView(ApiView):
         model_fields = self.model._fields
         try:
             embedded_list = next(field for field in fields
-                                 if isinstance(model_fields[field], EmbeddedDocumentListField))
+                                 if isinstance(model_fields.get(field), EmbeddedDocumentListField))
         except StopIteration:
             return
 
