@@ -8,8 +8,8 @@ from django.http.response import Http404
 from django_mongo_rest.models import FindParams
 from django_mongo_rest.utils import EnumValueError
 
-Param = namedtuple('Param', 'name type_cast required max_len min_len max min let choices')
-Param.__new__.__defaults__ = (None, False, None, None, None, None, None, None)
+Param = namedtuple('Param', 'name type_cast required max_len min_len max min let choices choice_list')
+Param.__new__.__defaults__ = (None, False, None, None, None, None, None, None, None)
 
 EMAIL_REGEX = re.compile(
     # dot-atom
@@ -116,6 +116,10 @@ def get_param(dct, param, request):
 
     if param.choices is not None and val.lower() not in param.choices:
         raise ValueError('Must be one of %s' % str(param.choices))
+
+    if param.choice_list is not None:
+        if any(item.lower() not in param.choice_list for item in val):
+            raise ValueError('Must be one of %s' % str(param.choice_list))
 
     return val
 
