@@ -19,6 +19,19 @@ class Audit(BaseModel, DynamicDocument):
     doc_id = ObjectIdField()
     action = StringField(choices=ACTIONS.choices_dict().items())
 
+    @staticmethod
+    def get_last_change(doc_ids, field):
+        audit_logs = {}
+        for al in Audit.find(**{'doc_id': {'$in': doc_ids},
+                                field: {'$exists': True}}):
+            doc_id = al['doc_id']
+            if (doc_id not in audit_logs or
+                    audit_logs[doc_id]._id.generation_time < al['_id'].generation_time):
+                audit_logs[doc_id] = al
+                audit_logs[doc_id]['timestamp'] = al['_id'].generation_time
+
+        return audit_logs
+
 def create(request, action, model_class, doc, extra_data):
     audit_doc = {
         'user': request.user.id,
